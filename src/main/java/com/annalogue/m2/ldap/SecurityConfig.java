@@ -26,6 +26,8 @@ public class SecurityConfig {
                         .requestMatchers("/upload").hasAnyRole("ADMIN", "PROF")
                         .requestMatchers("/admin").hasRole("ADMIN")
                         .requestMatchers("/members/**").hasRole("ADMIN")
+                        // TFAN26-97: only a teacher can create a module (GET form and POST)
+                        .requestMatchers("/modules/add").hasRole("PROF")
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

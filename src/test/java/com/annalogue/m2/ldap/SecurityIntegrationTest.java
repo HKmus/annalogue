@@ -1,7 +1,9 @@
 package com.annalogue.m2.ldap;
 
+import com.annalogue.m2.models.ModuleEntity;
 import com.annalogue.m2.models.Role;
 import com.annalogue.m2.services.HandleUserService;
+import com.annalogue.m2.services.IModuleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +17,7 @@ import org.springframework.mock.web.MockHttpSession;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,6 +34,10 @@ class SecurityIntegrationTest {
     // TFAN26-12: fake service, so no real user is created during the tests
     @MockitoBean
     private HandleUserService handleUserService;
+
+    // TFAN26-97: fake service, so no module is created during the tests
+    @MockitoBean
+    private IModuleService moduleService;
 
     @Test
     void loginShouldBeAccessibleWithoutAuthentication() throws Exception {
@@ -258,5 +265,70 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/modules"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    // ===== TFAN26-97: only a teacher can create a module =====
+
+    @Test
+    void studentShouldNotAccessAddModulePage() throws Exception {
+
+        mockMvc.perform(
+                        get("/modules/add")
+                                .with(user("student@test.com").roles("ETUDIANT"))
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminShouldNotAccessAddModulePage() throws Exception {
+
+        mockMvc.perform(
+                        get("/modules/add")
+                                .with(user("admin@test.com").roles("ADMIN"))
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void professorShouldAccessAddModulePage() throws Exception {
+
+        mockMvc.perform(
+                        get("/modules/add")
+                                .with(user("prof@test.com").roles("PROF"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name("modules/add"));
+    }
+
+    @Test
+    void studentShouldNotBeAbleToCreateModule() throws Exception {
+
+        mockMvc.perform(
+                        post("/modules/add")
+                                .with(user("student@test.com").roles("ETUDIANT"))
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .param("name", "MOIA")
+                )
+                .andExpect(status().isForbidden());
+
+        // the service must never be called
+        verify(moduleService, never()).createModule(any());
+    }
+
+    @Test
+    void professorShouldBeAbleToCreateModule() throws Exception {
+        when(moduleService.createModule("MOIA"))
+                .thenReturn(new ModuleEntity("MOIA", null));
+
+        mockMvc.perform(
+                        post("/modules/add")
+                                .with(user("prof@test.com").roles("PROF"))
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .param("name", "MOIA")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/modules"));
+
+        verify(moduleService).createModule("MOIA");
     }
 }
