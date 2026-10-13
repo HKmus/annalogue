@@ -2,9 +2,11 @@ package com.annalogue.m2.services;
 
 import com.annalogue.m2.exceptions.InvalidModuleDataException;
 import com.annalogue.m2.models.ModuleEntity;
+import com.annalogue.m2.models.Role;
 import com.annalogue.m2.models.UserEntity;
 import com.annalogue.m2.repositories.ModuleRepository;
 import com.annalogue.m2.repositories.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,12 @@ public class ModuleService implements IModuleService {
         }
 
         UserEntity currentUser = getCurrentUser();
+
+        // TFAN26-97: second protection (the first one is in SecurityConfig):
+        // only a teacher can be the responsible of a new module
+        if (currentUser.getRole() != Role.PROF) {
+            throw new AccessDeniedException("Only a teacher can create a module");
+        }
 
         return moduleRepository.save(new ModuleEntity(moduleName, currentUser));
     }
