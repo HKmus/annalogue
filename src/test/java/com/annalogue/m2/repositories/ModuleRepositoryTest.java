@@ -1,0 +1,89 @@
+package com.annalogue.m2.repositories;
+
+import com.annalogue.m2.models.ModuleEntity;
+import com.annalogue.m2.models.Role;
+import com.annalogue.m2.models.UserEntity;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class ModuleRepositoryTest {
+
+    @Autowired
+    private ModuleRepository moduleRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private UserEntity teacher;
+
+    @BeforeEach
+    void setUp() {
+        teacher = userRepository.save(
+                new UserEntity("fabrice@example.com", "hash", "fabrice", Role.PROF, null, null));
+    }
+
+    @Test
+    void shouldSaveModuleAndGiveItAnId() {
+        ModuleEntity saved = moduleRepository.save(new ModuleEntity("MOIA", teacher));
+
+        assertNotNull(saved.getId());
+    }
+
+    @Test
+    void shouldSaveTheResponsible() {
+        moduleRepository.saveAndFlush(new ModuleEntity("MOIA", teacher));
+
+        ModuleEntity found = moduleRepository.findByName("MOIA").orElseThrow();
+
+        assertEquals("fabrice@example.com", found.getResponsible().getEmail());
+    }
+
+    @Test
+    void shouldFindModuleByName() {
+        moduleRepository.save(new ModuleEntity("MOIA", teacher));
+
+        assertTrue(moduleRepository.findByName("MOIA").isPresent());
+        assertTrue(moduleRepository.findByName("TF").isEmpty());
+    }
+
+    @Test
+    void shouldCheckNameExistsIgnoringCase() {
+        moduleRepository.save(new ModuleEntity("MOIA", teacher));
+
+        assertTrue(moduleRepository.existsByNameIgnoreCase("moia"));
+        assertFalse(moduleRepository.existsByNameIgnoreCase("TF"));
+    }
+
+    @Test
+    void shouldReturnModulesSortedByName() {
+        moduleRepository.save(new ModuleEntity("TF", teacher));
+        moduleRepository.save(new ModuleEntity("MOIA", teacher));
+
+        List<String> names = moduleRepository.findAllByOrderByNameAsc()
+                .stream()
+                .map(ModuleEntity::getName)
+                .toList();
+
+        assertEquals(List.of("MOIA", "TF"), names);
+    }
+
+    @Test
+    void shouldRejectTwoModulesWithTheSameName() {
+        moduleRepository.saveAndFlush(new ModuleEntity("MOIA", teacher));
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> moduleRepository.saveAndFlush(new ModuleEntity("MOIA", teacher)));
+    }
+}

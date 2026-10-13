@@ -1,0 +1,36 @@
+<nav class="navbar navbar-expand-md bg-body-tertiary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/home" th:text="#{nav.brand}">Annalogue</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link active" aria-current="page" href="/" th:text="#{nav.home}">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/modules" th:text="#{nav.modules}">Modules</a>
+                </li>
+                <li class="nav-item">
+                    <a th:attr="class=${isAdmin == true ? 'nav-link' : 'nav-link disabled'}" href="/admin"
+                        th:text="#{nav.admin}">Admin Dashboard</a>
+                </li>
+                <li class="nav-item accordion">
+                    <p class="nav-link mb-0">
+                        <span th:text="#{nav.welcome}">Welcome,</span>
+                        <span id="email" th:text="${login}"></span>!
+                    </p>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="document.getElementById('logoutForm').submit()"
+                        th:text="#{nav.logout}">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <form id="logoutForm" action="/logout" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    </form>
+</nav>
