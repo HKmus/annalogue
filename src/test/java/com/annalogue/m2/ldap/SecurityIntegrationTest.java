@@ -58,11 +58,11 @@ class SecurityIntegrationTest {
     void homeShouldBeAccessibleForAuthenticatedUser() throws Exception {
 
         mockMvc.perform(
-                        get("/home")
-                                .with(user("test@test.com"))
-                )
+                get("/home")
+                        .with(user("test@test.com")))
                 .andExpect(status().isOk())
-                .andExpect(view().name("home"));
+                // « My modules » is the home page of the non-admin users
+                .andExpect(view().name("modules/list"));
     }
 
     // ===== TFAN26-12: only an admin can create members =====
@@ -79,9 +79,8 @@ class SecurityIntegrationTest {
     void studentShouldNotAccessAddMemberPage() throws Exception {
 
         mockMvc.perform(
-                        get("/members/add")
-                                .with(user("student@test.com").roles("ETUDIANT"))
-                )
+                get("/members/add")
+                        .with(user("student@test.com").roles("ETUDIANT")))
                 .andExpect(status().isForbidden());
     }
 
@@ -89,9 +88,8 @@ class SecurityIntegrationTest {
     void professorShouldNotAccessAddMemberPage() throws Exception {
 
         mockMvc.perform(
-                        get("/members/add")
-                                .with(user("prof@test.com").roles("PROF"))
-                )
+                get("/members/add")
+                        .with(user("prof@test.com").roles("PROF")))
                 .andExpect(status().isForbidden());
     }
 
@@ -99,28 +97,26 @@ class SecurityIntegrationTest {
     void studentShouldNotBeAbleToCreateMember() throws Exception {
 
         mockMvc.perform(
-                        post("/members/add")
-                                .with(user("student@test.com").roles("ETUDIANT"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                                .param("email", "new@test.com")
-                                .param("role", "ADMIN")
-                                .param("username", "new")
-                                .param("year", "2026").param("level", "M1")
-                                .param("group", "A")
-                )
+                post("/members/add")
+                        .with(user("student@test.com").roles("ETUDIANT"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
+                        .param("email", "new@test.com")
+                        .param("role", "ADMIN")
+                        .param("enteredUsername", "new")
+                        .param("year", "2026").param("level", "M1")
+                        .param("group", "A"))
                 .andExpect(status().isForbidden());
 
         // the service must never be called
-        verify(handleUserService, never()).addUser(any(), any(), any(),any(), any(), any());
+        verify(handleUserService, never()).addUser(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void adminShouldAccessAddMemberPage() throws Exception {
 
         mockMvc.perform(
-                        get("/members/add")
-                                .with(user("admin@test.com").roles("ADMIN"))
-                )
+                get("/members/add")
+                        .with(user("admin@test.com").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/add_member"));
     }
@@ -129,15 +125,14 @@ class SecurityIntegrationTest {
     void adminShouldBeAbleToCreateMember() throws Exception {
 
         mockMvc.perform(
-                        post("/members/add")
-                                .with(user("admin@test.com").roles("ADMIN"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                                .param("email", "new@test.com")
-                                .param("role", "ETUDIANT")
-                                .param("username", "new")
-                                .param("year", "2026").param("level", "M1")
-                                .param("group", "A")
-                )
+                post("/members/add")
+                        .with(user("admin@test.com").roles("ADMIN"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
+                        .param("email", "new@test.com")
+                        .param("role", "ETUDIANT")
+                        .param("enteredUsername", "new")
+                        .param("year", "2026").param("level", "M1")
+                        .param("group", "A"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/members/add"));
 
@@ -148,14 +143,12 @@ class SecurityIntegrationTest {
     void authenticatedUserShouldBeAbleToLogout() throws Exception {
 
         mockMvc.perform(
-                        post("/logout")
-                                .with(user("test@test.com"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                )
+                post("/logout")
+                        .with(user("test@test.com"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?logout"));
     }
-
 
     @Test
     void logoutShouldInvalidateSession() throws Exception {
@@ -164,27 +157,24 @@ class SecurityIntegrationTest {
 
         // Given : User is authenticated
         mockMvc.perform(
-                        get("/home")
-                                .session(session)
-                                .with(user("test@test.com"))
-                )
+                get("/home")
+                        .session(session)
+                        .with(user("test@test.com")))
                 .andExpect(status().isOk());
 
         // Logout
         mockMvc.perform(
-                        post("/logout")
-                                .session(session)
-                                .with(user("test@test.com"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                )
+                post("/logout")
+                        .session(session)
+                        .with(user("test@test.com"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?logout"));
 
         // Session must be not usefully like authenticated session anymore
         mockMvc.perform(
-                        get("/home")
-                                .session(session)
-                )
+                get("/home")
+                        .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
     }
@@ -193,9 +183,8 @@ class SecurityIntegrationTest {
     void logoutShouldRequireCsrf() throws Exception {
 
         mockMvc.perform(
-                        post("/logout")
-                                .with(user("test@test.com"))
-                )
+                post("/logout")
+                        .with(user("test@test.com")))
                 .andExpect(status().isForbidden());
     }
 
@@ -213,10 +202,9 @@ class SecurityIntegrationTest {
     void studentShouldNotBeAbleToDeleteMember() throws Exception {
 
         mockMvc.perform(
-                        post("/members/1/delete")
-                                .with(user("student@example.com").roles("ETUDIANT"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                )
+                post("/members/1/delete")
+                        .with(user("student@example.com").roles("ETUDIANT"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
 
         verify(handleUserService, never()).deleteUser(any());
@@ -226,10 +214,9 @@ class SecurityIntegrationTest {
     void professorShouldNotBeAbleToDeleteMember() throws Exception {
 
         mockMvc.perform(
-                        post("/members/1/delete")
-                                .with(user("prof@example.com").roles("PROF"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                )
+                post("/members/1/delete")
+                        .with(user("prof@example.com").roles("PROF"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().isForbidden());
 
         verify(handleUserService, never()).deleteUser(any());
@@ -239,10 +226,9 @@ class SecurityIntegrationTest {
     void adminShouldBeAbleToDeleteMember() throws Exception {
 
         mockMvc.perform(
-                        post("/members/1/delete")
-                                .with(user("admin@example.com").roles("ADMIN"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                )
+                post("/members/1/delete")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/members"));
 
@@ -267,68 +253,59 @@ class SecurityIntegrationTest {
                 .andExpect(redirectedUrl("/login"));
     }
 
-    // ===== TFAN26-97: only a teacher can create a module =====
+    // ===== TFAN26-125 (ADMIN-02): only the admin changes a role =====
+
+    @Test
+    void nonAdminShouldNotChangeRoles() throws Exception {
+
+        mockMvc.perform(
+                post("/members/1/role")
+                        .with(user("prof@example.com").roles("RESPONSABLE"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
+                        .param("role", "RESPONSABLE"))
+                .andExpect(status().isForbidden());
+
+        verify(handleUserService, never()).changeRole(any(), any());
+    }
+
+    // ===== only a Responsable Module creates modules =====
+
+    @Test
+    void professorShouldNotAccessAddModulePage() throws Exception {
+
+        mockMvc.perform(
+                get("/modules/add")
+                        .with(user("prof@test.com").roles("PROF")))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void studentShouldNotAccessAddModulePage() throws Exception {
 
         mockMvc.perform(
-                        get("/modules/add")
-                                .with(user("student@test.com").roles("ETUDIANT"))
-                )
+                get("/modules/add")
+                        .with(user("student@test.com").roles("ETUDIANT")))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void adminShouldNotAccessAddModulePage() throws Exception {
+    void adminShouldNotCreateModule() throws Exception {
 
         mockMvc.perform(
-                        get("/modules/add")
-                                .with(user("admin@test.com").roles("ADMIN"))
-                )
+                post("/modules/add")
+                        .with(user("admin@test.com").roles("ADMIN"))
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
+                        .param("name", "MOIA"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void professorShouldAccessAddModulePage() throws Exception {
+    void responsableShouldAccessAddModulePage() throws Exception {
 
         mockMvc.perform(
-                        get("/modules/add")
-                                .with(user("prof@test.com").roles("PROF"))
-                )
+                get("/modules/add")
+                        .with(user("resp@test.com").roles("RESPONSABLE")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("modules/add"));
-    }
-
-    @Test
-    void studentShouldNotBeAbleToCreateModule() throws Exception {
-
-        mockMvc.perform(
-                        post("/modules/add")
-                                .with(user("student@test.com").roles("ETUDIANT"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                                .param("name", "MOIA")
-                )
-                .andExpect(status().isForbidden());
-
-        // the service must never be called
-        verify(moduleService, never()).createModule(any());
-    }
-
-    @Test
-    void professorShouldBeAbleToCreateModule() throws Exception {
-        when(moduleService.createModule("MOIA"))
-                .thenReturn(new ModuleEntity("MOIA", null));
-
-        mockMvc.perform(
-                        post("/modules/add")
-                                .with(user("prof@test.com").roles("PROF"))
-                                .with(SecurityMockMvcRequestPostProcessors.csrf())
-                                .param("name", "MOIA")
-                )
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/modules"));
-
-        verify(moduleService).createModule("MOIA");
     }
 }

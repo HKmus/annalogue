@@ -86,4 +86,32 @@ class ModuleRepositoryTest {
         assertThrows(DataIntegrityViolationException.class,
                 () -> moduleRepository.saveAndFlush(new ModuleEntity("MOIA", teacher)));
     }
+
+
+        @Test
+    void shouldFindTheModulesManagedByATeacher() {
+        UserEntity claire = userRepository.save(
+                new UserEntity("claire@example.com", "hash", "claire", Role.PROF, null, null));
+        moduleRepository.save(new ModuleEntity("TF", teacher));
+        moduleRepository.save(new ModuleEntity("MOIA", teacher));
+        moduleRepository.save(new ModuleEntity("JPA", claire));
+
+        List<String> names = moduleRepository.findByResponsibleIdOrderByNameAsc(teacher.getId())
+                .stream()
+                .map(ModuleEntity::getName)
+                .toList();
+
+        // only Fabrice's modules, sorted; JPA belongs to Claire
+        assertEquals(List.of("MOIA", "TF"), names);
+    }
+
+    @Test
+    void shouldKnowIfAUserStillManagesModules() {
+        UserEntity other = userRepository.save(
+                new UserEntity("claire@example.com", "hash", "claire", Role.RESPONSABLE, null, null));
+        moduleRepository.save(new ModuleEntity("MOIA", teacher));
+
+        assertTrue(moduleRepository.existsByResponsibleId(teacher.getId()));
+        assertFalse(moduleRepository.existsByResponsibleId(other.getId()));
+    }
 }

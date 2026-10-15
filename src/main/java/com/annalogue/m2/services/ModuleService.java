@@ -1,18 +1,21 @@
 package com.annalogue.m2.services;
 
+import com.annalogue.m2.dto.UserModuleView;
 import com.annalogue.m2.exceptions.InvalidModuleDataException;
+import com.annalogue.m2.models.InscriptionEntity;
 import com.annalogue.m2.models.ModuleEntity;
-import com.annalogue.m2.models.Role;
+import com.annalogue.m2.models.PublicationEntity;
 import com.annalogue.m2.models.UserEntity;
+import com.annalogue.m2.repositories.InscriptionRepository;
 import com.annalogue.m2.repositories.ModuleRepository;
 import com.annalogue.m2.repositories.UserRepository;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -20,14 +23,23 @@ import java.util.Optional;
 public class ModuleService implements IModuleService {
 
     private static final int MAX_NAME_LENGTH = 255;
+    private static final String ROLE_KEY_PREFIX = "my.modules.role.";
 
     private final ModuleRepository moduleRepository;
 
     private final UserRepository userRepository;
+    private final IUserService iUserService;
+    private final InscriptionRepository inscriptionRepository;
 
-    public ModuleService(ModuleRepository moduleRepository, UserRepository userRepository) {
+    public ModuleService(ModuleRepository moduleRepository,
+            UserRepository userRepository,
+            InscriptionRepository inscriptionRepository,
+            IUserService iUserService) {
+
         this.moduleRepository = moduleRepository;
         this.userRepository = userRepository;
+        this.iUserService = iUserService;
+        this.inscriptionRepository = inscriptionRepository;
     }
 
     @Override
@@ -46,34 +58,57 @@ public class ModuleService implements IModuleService {
             throw new InvalidModuleDataException("error.module.name.exists");
         }
 
-        UserEntity currentUser = getCurrentUser();
+        UserEntity currentUser = iUserService.getCurrentUser();
 
-        // TFAN26-97: second protection (the first one is in SecurityConfig):
-        // only a teacher can be the responsible of a new module
-        if (currentUser.getRole() != Role.PROF) {
-            throw new AccessDeniedException("Only a teacher can create a module");
-        }
+        ModuleEntity module = moduleRepository.save(new ModuleEntity(moduleName, currentUser));
 
-        return moduleRepository.save(new ModuleEntity(moduleName, currentUser));
+        InscriptionEntity inscription = new InscriptionEntity();
+        inscription.setUser(currentUser);
+        inscription.setModule(module);
+        inscription.setInscriptionType(com.annalogue.m2.models.InscriptionType.INTERVENANT);
+        inscription.setEditor(true);
+        inscriptionRepository.save(inscription);
+
+        return module;
     }
 
-    private String getCurrentUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    @Override
+    public List<UserModuleView> findModulesOfUser(String email) {
+        if (email == null || email.isBlank()) {
+            return List.of();
+        }
+        Optional<UserEntity> user = userRepository.findByEmail(email.trim());
+        if (user.isEmpty()) {
+            return List.of();
+        }
+        Long userId = user.get().getId();
 
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || Objects.equals(authentication.getPrincipal(), "anonymousUser")) {
-            throw new IllegalStateException("No users logged in");
+        Map<Long, UserModuleView> modules = new LinkedHashMap<>();
+
+        for (ModuleEntity module : moduleRepository.findByResponsibleIdOrderByNameAsc(userId)) {
+            modules.put(module.getId(), new UserModuleView(
+                    module.getId(), module.getName(), UserModuleView.RESPONSIBLE_ROLE_KEY, false));
         }
 
-        return authentication.getName();
+        for (InscriptionEntity inscription : inscriptionRepository.findByUserId(userId)) {
+            ModuleEntity module = inscription.getModule();
+            modules.putIfAbsent(module.getId(), new UserModuleView(
+                    module.getId(),
+                    module.getName(),
+                    ROLE_KEY_PREFIX + inscription.getInscriptionType().name(),
+                    inscription.isEditor()));
+        }
+
+        return modules.values().stream()
+                .sorted(Comparator.comparing(UserModuleView::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
-    private UserEntity getCurrentUser() {
-        String email = getCurrentUserEmail();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Logged-in user not found"));
+    @Override
+    public List<UserModuleView> findAllModuleViews() {
+        return findAll().stream()
+                .map(module -> new UserModuleView(module.getId(), module.getName(), null, false))
+                .toList();
     }
 
     @Override
@@ -89,5 +124,23 @@ public class ModuleService implements IModuleService {
     @Override
     public boolean existsByName(String name) {
         return name != null && moduleRepository.existsByNameIgnoreCase(name.trim());
+    }
+
+    @Override
+    public void deleteAll() {
+        moduleRepository.deleteAll();
+    }
+
+    @Override
+    public List<PublicationEntity> findAllPublicationsFromModule(ModuleEntity module) {
+
+        return module.getPublications();
+    }
+
+    @Override
+    public List<PublicationEntity> findAllPublicationsFromModule(long id) {
+        return moduleRepository.findById(id)
+                .map(ModuleEntity::getPublications)
+                .orElse(List.of());
     }
 }

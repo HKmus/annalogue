@@ -58,6 +58,9 @@ class PublicationControllerTest {
 	@MockitoBean
 	private CustomUserDetailsService customUserDetailsService;
 
+    @MockitoBean
+    private IInscriptionService inscriptionService;
+
 	@Test
 	void shouldShowUploadPageForAdmin() throws Exception {
 
@@ -97,7 +100,7 @@ class PublicationControllerTest {
 						.with(csrf()))
 				.andExpect(status().is3xxRedirection())
 				.andExpect(redirectedUrl("/upload"))
-				.andExpect(flash().attribute("success", "success.upload.file"));
+				.andExpect(flash().attribute("successKey", "success.upload.file"));
 
 		verify(publicationService).saveMultipartFile(
 				any(),
@@ -132,7 +135,7 @@ class PublicationControllerTest {
 						.with(csrf()))
 				.andExpect(status().is3xxRedirection())
 				.andExpect(redirectedUrl("/upload"))
-				.andExpect(flash().attribute("error", "error.upload.failed"))
+				.andExpect(flash().attribute("errorKey", "error.upload.failed"))
 				.andExpect(flash().attribute("name", "My file"))
 				.andExpect(flash().attribute("description", "A PDF"))
 				.andExpect(flash().attribute("moduleId", 1L))

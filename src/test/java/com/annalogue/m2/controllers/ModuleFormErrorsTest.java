@@ -2,6 +2,7 @@ package com.annalogue.m2.controllers;
 
 import com.annalogue.m2.exceptions.InvalidModuleDataException;
 import com.annalogue.m2.services.IModuleService;
+import com.annalogue.m2.services.IUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -21,69 +22,72 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// TFAN26-48: the page really displays the errors of the module creation form
-// (ModuleControllerTest does not render the page, so it cannot check the text)
 @WebMvcTest(ModuleController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 class ModuleFormErrorsTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @MockitoBean
-    private IModuleService moduleService;
+        @MockitoBean
+        private IModuleService moduleService;
 
-    @Test
-    void emptyFormShouldShowNoError() throws Exception {
-        mockMvc.perform(get("/modules/add").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("is-invalid"))))
-                .andExpect(content().string(not(containsString("alert-danger"))));
-    }
+        @MockitoBean
+        private IUserService userService;
 
-    @Test
-    void shouldShowEmptyNameErrorUnderTheField() throws Exception {
-        when(moduleService.createModule(any()))
-                .thenThrow(new InvalidModuleDataException("error.module.name.empty"));
+        @Test
+        void emptyFormShouldShowNoError() throws Exception {
+                mockMvc.perform(get("/modules/add").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(not(containsString("is-invalid"))))
+                                .andExpect(content().string(not(containsString("alert-danger"))));
+        }
 
-        mockMvc.perform(post("/modules/add").param("name", "   ").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("is-invalid")))
-                .andExpect(content().string(containsString("invalid-feedback")))
-                .andExpect(content().string(containsString("The module name is required.")));
-    }
+        @Test
+        void shouldShowEmptyNameErrorUnderTheField() throws Exception {
+                when(moduleService.createModule(any()))
+                                .thenThrow(new InvalidModuleDataException("error.module.name.empty"));
 
-    @Test
-    void shouldShowTooLongNameError() throws Exception {
-        when(moduleService.createModule(any()))
-                .thenThrow(new InvalidModuleDataException("error.module.name.tooLong"));
+                mockMvc.perform(post("/modules/add").param("name", "   ").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(containsString("is-invalid")))
+                                .andExpect(content().string(containsString("invalid-feedback")))
+                                .andExpect(content().string(containsString("The module name is required.")));
+        }
 
-        mockMvc.perform(post("/modules/add").param("name", "M".repeat(256)).with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("The module name must be at most 255 characters.")));
-    }
+        @Test
+        void shouldShowTooLongNameError() throws Exception {
+                when(moduleService.createModule(any()))
+                                .thenThrow(new InvalidModuleDataException("error.module.name.tooLong"));
 
-    @Test
-    void shouldShowNameAlreadyUsedErrorAndKeepTheTypedName() throws Exception {
-        when(moduleService.createModule("MOIA"))
-                .thenThrow(new InvalidModuleDataException("error.module.name.exists"));
+                mockMvc.perform(post("/modules/add").param("name", "M".repeat(256)).with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(
+                                                containsString("The module name must be at most 255 characters.")));
+        }
 
-        mockMvc.perform(post("/modules/add").param("name", "MOIA").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("is-invalid")))
-                .andExpect(content().string(containsString("A module with this name already exists.")))
-                .andExpect(content().string(containsString("value=\"MOIA\"")));
-    }
+        @Test
+        void shouldShowNameAlreadyUsedErrorAndKeepTheTypedName() throws Exception {
+                when(moduleService.createModule("MOIA"))
+                                .thenThrow(new InvalidModuleDataException("error.module.name.exists"));
 
-    @Test
-    void shouldShowDatabaseErrorAsGeneralAlert() throws Exception {
-        when(moduleService.createModule("MOIA"))
-                .thenThrow(new DataAccessResourceFailureException("Database down"));
+                mockMvc.perform(post("/modules/add").param("name", "MOIA").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(containsString("is-invalid")))
+                                .andExpect(content().string(containsString("A module with this name already exists.")))
+                                .andExpect(content().string(containsString("value=\"MOIA\"")));
+        }
 
-        mockMvc.perform(post("/modules/add").param("name", "MOIA").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("alert-danger")))
-                .andExpect(content().string(containsString("The module could not be saved. Please try again later.")));
-    }
+        @Test
+        void shouldShowDatabaseErrorAsGeneralAlert() throws Exception {
+                when(moduleService.createModule("MOIA"))
+                                .thenThrow(new DataAccessResourceFailureException("Database down"));
+
+                mockMvc.perform(post("/modules/add").param("name", "MOIA").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(containsString("alert-danger")))
+                                .andExpect(content().string(containsString(
+                                                "The module could not be saved. Please try again later.")));
+        }
 }

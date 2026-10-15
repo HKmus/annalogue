@@ -3,6 +3,7 @@ package com.annalogue.m2.controllers;
 import com.annalogue.m2.exceptions.StorageFileNotFoundException;
 import com.annalogue.m2.exceptions.UploadFileException;
 import com.annalogue.m2.models.FileType;
+import com.annalogue.m2.services.IInscriptionService;
 import com.annalogue.m2.services.IModuleService;
 import com.annalogue.m2.services.IPublicationService;
 import com.annalogue.m2.services.IUserService;
@@ -32,6 +33,9 @@ public class PublicationController {
 
 	@Autowired
 	private IUserService userService;
+
+    @Autowired
+    private IInscriptionService inscriptionService;
 
 	@PostMapping("/publications")
 	public String addPublication() {
@@ -65,11 +69,13 @@ public class PublicationController {
 
 		if (authentication != null) {
 			userService.findByEmail(authentication.getName()).ifPresent(
-					userEntity -> model.addAttribute("username", userEntity.getUsername()));
+					userEntity -> {
+						var modules = inscriptionService.getAllModulesEditable(userEntity);
+						model.addAttribute("modules", modules);
+					});
 		}
 
 		model.addAttribute("fileType", FileType.values());
-		model.addAttribute("modules", moduleService.findAll());
 		return "modules/upload_file";
 	}
 
@@ -86,8 +92,10 @@ public class PublicationController {
 
 		try {
 			publicationService.saveMultipartFile(file, name, description, moduleId, authorEmail, fileType);
+			moduleService.findById(moduleId).ifPresent(module -> 
+				redirectAttributes.addFlashAttribute("createdModuleName", module.getName()));
 		} catch (UploadFileException e) {
-			redirectAttributes.addFlashAttribute("error", e.getMessage());
+			redirectAttributes.addFlashAttribute("errorKey", e.getMessage());
 			redirectAttributes.addFlashAttribute("name", name);
 			redirectAttributes.addFlashAttribute("description", description);
 			redirectAttributes.addFlashAttribute("moduleId", moduleId);
@@ -95,7 +103,7 @@ public class PublicationController {
 			return "redirect:/upload";
 		}
 
-		redirectAttributes.addFlashAttribute("success", "success.upload.file");
+		redirectAttributes.addFlashAttribute("successKey", "success.upload.file");
 		return "redirect:/upload";
 	}
 

@@ -32,8 +32,12 @@
                              under the field: the key comes from ModuleController (nameErrorKey) -->
                         <input type="text" id="name" name="name" class="form-control" th:value="${name}"
                             th:classappend="${nameErrorKey != null} ? 'is-invalid'"
+<<<<<<< HEAD
                             th:attr="aria-describedby=${nameErrorKey != null} ? 'name-error'"
                             required maxlength="255">
+=======
+                            th:attr="aria-describedby=${nameErrorKey != null} ? 'name-error'" required maxlength="255">
+>>>>>>> 1539783 (update the app)
                         <div id="name-error" class="invalid-feedback" th:if="${nameErrorKey}"
                             th:text="#{${nameErrorKey}}">Error</div>
                     </div>
