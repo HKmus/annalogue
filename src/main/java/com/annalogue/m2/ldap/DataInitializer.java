@@ -10,6 +10,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import com.annalogue.m2.models.StudyLevel;
 
+import org.springframework.context.annotation.Profile;
+
+@Profile("!test") // demo accounts only for the real application, never in the tests
 @Component
 public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;

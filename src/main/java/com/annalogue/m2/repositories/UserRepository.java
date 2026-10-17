@@ -23,4 +23,5 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     // members list, sorted by username
     List<UserEntity> findAllByOrderByUsernameAsc();
 
+    List<UserEntity> findByGroupNameIgnoreCaseOrderByUsernameAsc(String groupName);
 }

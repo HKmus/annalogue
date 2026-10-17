@@ -21,17 +21,17 @@
 
                 <!-- Dropdown menu for user -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="dropdownLogout">
                         <span th:text="${username}"></span>
                     </a>
-                    <ul class="dropdown-menu">
+                    <ul class="dropdown-menu" >
 
                         <li class="nav-item">
                             <a class="dropdown-item" href="/change-password" th:text="#{home.change.password}">Change password</a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li class="nav-item">
-                            <a class="dropdown-item" href="#" onclick="document.getElementById('logoutForm').submit()"
+                            <a class="dropdown-item" id="logout" href="#" onclick="document.getElementById('logoutForm').submit()"
                                th:text="#{nav.logout}">Logout</a>
                         </li>
 

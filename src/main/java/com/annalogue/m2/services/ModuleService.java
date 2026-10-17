@@ -32,9 +32,9 @@ public class ModuleService implements IModuleService {
     private final InscriptionRepository inscriptionRepository;
 
     public ModuleService(ModuleRepository moduleRepository,
-            UserRepository userRepository,
-            InscriptionRepository inscriptionRepository,
-            IUserService iUserService) {
+                         UserRepository userRepository,
+                         InscriptionRepository inscriptionRepository,
+                         IUserService iUserService) {
 
         this.moduleRepository = moduleRepository;
         this.userRepository = userRepository;

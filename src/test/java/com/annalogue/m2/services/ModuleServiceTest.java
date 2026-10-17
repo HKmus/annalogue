@@ -21,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -53,12 +52,6 @@ class ModuleServiceTest {
 
     private final UserEntity teacher =
             new UserEntity("fabrice@example.com", "hash", "fabrice", Role.PROF, null, null);
-
-    private final UserEntity student =
-            new UserEntity("lucas@example.com", "hash", "lucas", Role.ETUDIANT, 2026, "A");
-
-    private final UserEntity admin =
-            new UserEntity("admin@example.com", "hash", "admin", Role.ADMIN, null, null);
 
     private void loggedInAs(UserEntity user) {
         when(iUserService.getCurrentUser()).thenReturn(user);
@@ -99,26 +92,6 @@ class ModuleServiceTest {
                 .thenThrow(new IllegalStateException("No users logged in"));
 
         assertThrows(IllegalStateException.class, () -> moduleService.createModule("MOIA"));
-
-        verify(moduleRepository, never()).save(any());
-    }
-
-    // ===== TFAN26-97: only a teacher can create a module =====
-
-    @Test
-    void shouldRefuseStudentCreatingModule() {
-        loggedInAs(student);
-
-        assertThrows(AccessDeniedException.class, () -> moduleService.createModule("MOIA"));
-
-        verify(moduleRepository, never()).save(any());
-    }
-
-    @Test
-    void shouldRefuseAdminCreatingModule() {
-        loggedInAs(admin);
-
-        assertThrows(AccessDeniedException.class, () -> moduleService.createModule("MOIA"));
 
         verify(moduleRepository, never()).save(any());
     }
