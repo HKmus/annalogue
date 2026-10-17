@@ -30,6 +30,8 @@ public interface IInscriptionService {
 
     public void deleteById(Long id);
 
+    public void deleteAll();
+
     public boolean existsById(Long id);
 
     public boolean hasWriterAccess(UserEntity user, ModuleEntity module);
@@ -42,6 +44,8 @@ public interface IInscriptionService {
 
     @Transactional
     public boolean toggleEditor(Long inscriptionId);
+
+    List<ModuleEntity> getModulesAsIntervenant(UserEntity user);
 
     @Transactional
     public GroupEnrollmentResult saveGroup(UserEntity currentUser, String group, Long moduleId);

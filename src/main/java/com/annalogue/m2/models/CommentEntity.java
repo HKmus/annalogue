@@ -2,6 +2,8 @@ package com.annalogue.m2.models;
 
 import jakarta.persistence.*;
 
+import java.io.File;
+
 @Entity
 public class CommentEntity {
 
@@ -20,16 +22,31 @@ public class CommentEntity {
     @JoinColumn(name = "publication_id")
     private PublicationEntity publication;
 
+    @ManyToOne
+    @JoinColumn(name = "correction_id")
+    private CorrectionEntity correction;
+
+    @Column(name = "path", nullable = true)
+    private String path;
+
     public CommentEntity() {}
 
     public CommentEntity(String content) {
         this.content = content;
     }
 
-    public CommentEntity(String content, UserEntity author, PublicationEntity publication) {
+    public CommentEntity(String content, UserEntity author, PublicationEntity publication, String path) {
         this.content = content;
         this.authorComment = author;
         this.publication = publication;
+        this.path = path;
+    }
+
+    public CommentEntity(String content, UserEntity author, CorrectionEntity correction, String path) {
+        this.content = content;
+        this.authorComment = author;
+        this.correction = correction;
+        this.path = path;
     }
 
     public void setAuthorComment(UserEntity authorComment) {
@@ -58,5 +75,21 @@ public class CommentEntity {
 
     public PublicationEntity getPublication() {
         return publication;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    public CorrectionEntity getCorrection() {
+        return correction;
+    }
+
+    public void setCorrection(CorrectionEntity correction) {
+        this.correction = correction;
     }
 }

@@ -14,16 +14,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 public class PublicationServiceTest {
 
@@ -42,6 +42,11 @@ public class PublicationServiceTest {
 	@Mock
 	private IInscriptionService inscriptionService;
 
+    @Mock
+    private IFilesService filesService;
+	@Mock
+    private INotificationService notificationService;
+
 	@InjectMocks
 	private PublicationService publicationService;
 	private AutoCloseable mocks;
@@ -49,9 +54,6 @@ public class PublicationServiceTest {
 	@BeforeEach
 	public void setUp() throws Exception {
 		mocks = MockitoAnnotations.openMocks(this);
-		Field uploadDirField = PublicationService.class.getDeclaredField("uploadDir");
-		uploadDirField.setAccessible(true);
-		uploadDirField.set(publicationService, "/tmp/test-uploads");
 
 		File testUploadDir = new File("/tmp/test-uploads");
 		if (!testUploadDir.exists()) {
@@ -98,47 +100,51 @@ public class PublicationServiceTest {
 
 		Mockito.when(inscriptionService.hasWriterAccess(Mockito.any(), Mockito.any())).thenReturn(true);
 
+		File mockFile = new File("/tmp/test-uploads/testFile.pdf");
+		Mockito.when(filesService.saveMultipartFile(Mockito.any())).thenReturn(mockFile);
+
 		publicationService.saveMultipartFile(multipartFile, "testFile", "testDescription", 1L, "test@test.com", FileType.CM);
 
 		Mockito.verify(publicationRepository, Mockito.times(1)).save(Mockito.any(PublicationEntity.class));
 	}
 
 	@Test
-	void testLoadAsResource() throws IOException {
-		File testFile = new File("/tmp/test-uploads/testFile.pdf");
-		testFile.createNewFile();
-
+	void testLoadAsResourceSuccessfully() throws StorageFileNotFoundException {
 		PublicationEntity publicationEntity = new PublicationEntity();
 		publicationEntity.setFilePath("/tmp/test-uploads/testFile.pdf");
-		Mockito.when(publicationRepository.findById(Mockito.anyLong())).thenReturn(Optional.of(publicationEntity));
+		Resource mockResource = mock(Resource.class);
 
-		publicationService.loadAsResource(1L);
+		when(publicationRepository.findById(1L)).thenReturn(Optional.of(publicationEntity));
+		when(filesService.loadAsResource("/tmp/test-uploads/testFile.pdf")).thenReturn(mockResource);
 
-		Mockito.verify(publicationRepository, Mockito.times(1)).findById(Mockito.anyLong());
+		Resource result = publicationService.loadAsResource(1L);
 
-	}
-
-
-	@Test
-	void testLoadAsResourceWithNotFoundException() {
-		assertThrows(StorageFileNotFoundException.class, () -> {
-			publicationService.loadAsResource(1L);
-		});
-
-		Mockito.verify(publicationRepository, Mockito.times(1)).findById(Mockito.anyLong());
+		assertNotNull(result);
+		verify(publicationRepository).findById(1L);
+		verify(filesService).loadAsResource("/tmp/test-uploads/testFile.pdf");
 	}
 
 	@Test
-	void testLoadAsResourceWithIOException() {
+	void testLoadAsResourceWithNullPath() throws StorageFileNotFoundException {
 		PublicationEntity publicationEntity = new PublicationEntity();
-		publicationEntity.setFilePath("/tmp/test-uploads/testFile.pdf");
-		Mockito.when(publicationRepository.findById(Mockito.anyLong())).thenReturn(Optional.of(publicationEntity));
+		publicationEntity.setFilePath(null);
 
-		assertThrows(StorageFileNotFoundException.class, () -> {
-			publicationService.loadAsResource(1L);
-		});
+		when(publicationRepository.findById(1L)).thenReturn(Optional.of(publicationEntity));
 
-		Mockito.verify(publicationRepository, Mockito.times(1)).findById(Mockito.anyLong());
+		assertThrows(StorageFileNotFoundException.class, () -> publicationService.loadAsResource(1L));
+
+		verify(publicationRepository).findById(1L);
+		verify(filesService, never()).loadAsResource(any());
+	}
+
+	@Test
+	void testLoadAsResourceWithNonExistentPublication() throws StorageFileNotFoundException {
+		when(publicationRepository.findById(1L)).thenReturn(Optional.empty());
+
+		assertThrows(StorageFileNotFoundException.class, () -> publicationService.loadAsResource(1L));
+
+		verify(publicationRepository).findById(1L);
+		verify(filesService, never()).loadAsResource(any());
 	}
 
 	@Test
@@ -149,14 +155,9 @@ public class PublicationServiceTest {
 		MultipartFile multipartFile = Mockito.mock(MultipartFile.class);
 		Mockito.when(multipartFile.getOriginalFilename()).thenReturn("testFile.pdf");
 		Mockito.when(multipartFile.getSize()).thenReturn(100L);
-		Mockito.doAnswer(invocation -> {
-			File dest = invocation.getArgument(0);
-			dest.createNewFile();
-			return null;
-		}).when(multipartFile).transferTo(Mockito.any(File.class));
 
 		File testFileNew = new File("/tmp/test-uploads/testFile-1.pdf");
-
+		Mockito.when(filesService.saveMultipartFile(Mockito.any())).thenReturn(testFileNew);
 
 		ModuleEntity moduleEntity = new ModuleEntity();
 		Mockito.when(moduleService.findById(Mockito.anyLong())).thenReturn(Optional.of(moduleEntity));
@@ -172,8 +173,33 @@ public class PublicationServiceTest {
 
 		Mockito.verify(publicationRepository, Mockito.times(1)).save(Mockito.any(PublicationEntity.class));
 
-		assertTrue(testFileNew.exists());
+		Mockito.verify(filesService, Mockito.times(1)).saveMultipartFile(Mockito.any());
 
+	}
+	@Test
+	void testAddPublicationNotifiesTheModule() throws UploadFileException {
+		MultipartFile multipartFile = Mockito.mock(MultipartFile.class);
+		Mockito.when(moduleService.findById(Mockito.anyLong())).thenReturn(Optional.of(new ModuleEntity()));
+		Mockito.when(userService.findByEmail(Mockito.anyString())).thenReturn(Optional.of(new UserEntity()));
+		Mockito.when(inscriptionService.hasWriterAccess(Mockito.any(), Mockito.any())).thenReturn(true);
+		Mockito.when(filesService.saveMultipartFile(Mockito.any())).thenReturn(new File("/tmp/test-uploads/testFile.pdf"));
 
+		publicationService.saveMultipartFile(multipartFile, "testFile", "testDescription", 1L, "test@test.com", FileType.CM);
+
+		Mockito.verify(notificationService).notifyPublicationAdded(Mockito.any(PublicationEntity.class));
+	}
+
+	@Test
+	void testNoNotificationWhenUploadIsForbidden() throws UploadFileException {
+		MultipartFile multipartFile = Mockito.mock(MultipartFile.class);
+		Mockito.when(moduleService.findById(Mockito.anyLong())).thenReturn(Optional.of(new ModuleEntity()));
+		Mockito.when(userService.findByEmail(Mockito.anyString())).thenReturn(Optional.of(new UserEntity()));
+		Mockito.when(inscriptionService.hasWriterAccess(Mockito.any(), Mockito.any())).thenReturn(false);
+
+		assertThrows(UploadFileException.class, () ->
+				publicationService.saveMultipartFile(multipartFile, "testFile", "testDescription", 1L, "test@test.com", FileType.CM));
+
+		Mockito.verify(notificationService, never()).notifyPublicationAdded(Mockito.any());
+		Mockito.verify(filesService, never()).saveMultipartFile(Mockito.any());
 	}
 }

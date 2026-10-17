@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -24,12 +25,14 @@ import com.annalogue.m2.dto.GroupEnrollmentResult;
 import java.util.Set;
 
 @Service
+@Transactional
 public class InscriptionService implements IInscriptionService {
 
     private final InscriptionRepository inscriptionRepository;
     private final ModuleRepository moduleRepository;
     private final UserRepository userRepository;
     private final PublicationRepository publicationRepository;
+    private final INotificationService notificationService;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
@@ -37,11 +40,13 @@ public class InscriptionService implements IInscriptionService {
             InscriptionRepository inscriptionRepository,
             ModuleRepository moduleRepository,
             UserRepository userRepository,
-            PublicationRepository publicationRepository) {
+            PublicationRepository publicationRepository,
+            INotificationService notificationService) {
         this.inscriptionRepository = inscriptionRepository;
         this.moduleRepository = moduleRepository;
         this.userRepository = userRepository;
         this.publicationRepository = publicationRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -64,10 +69,12 @@ public class InscriptionService implements IInscriptionService {
         return inscriptionRepository.findByUserId(id);
     }
 
+    @Override
     public List<InscriptionEntity> findByEditorFalse() {
         return inscriptionRepository.findByEditorFalse();
     }
 
+    @Override
     public List<InscriptionEntity> findByEditorTrue() {
         return inscriptionRepository.findByEditorTrue();
     }
@@ -75,6 +82,11 @@ public class InscriptionService implements IInscriptionService {
     @Override
     public void deleteById(Long id) {
         inscriptionRepository.deleteById(id);
+    }
+
+    @Override
+    public void deleteAll() {
+        inscriptionRepository.deleteAll();
     }
 
     @Override
@@ -187,9 +199,14 @@ public class InscriptionService implements IInscriptionService {
         inscription.setInscriptionType(inscriptionType);
         inscription.setEditor(member.getId().equals(module.getResponsible().getId()));
 
-        return inscriptionRepository.save(inscription);
+        InscriptionEntity saved = inscriptionRepository.save(inscription);
+
+        notificationService.notifyEnrollment(member, module);
+
+        return saved;
     }
 
+    @Override
     public boolean canAccessFile(String email, Long fileId) throws UserNotFoundException, StorageFileNotFoundException {
         UserEntity user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -200,17 +217,20 @@ public class InscriptionService implements IInscriptionService {
         return hasReaderAccess(user, module);
     }
 
+    @Override
     public boolean hasWriterAccess(UserEntity user, ModuleEntity module) {
         InscriptionEntity inscription = inscriptionRepository.findByUserAndModule(user, module).orElse(null);
 
         return user.getRole() == Role.ADMIN || (inscription != null && inscription.isEditor());
     }
 
+    @Override
     public boolean hasReaderAccess(UserEntity user, ModuleEntity module) {
         InscriptionEntity inscription = inscriptionRepository.findByUserAndModule(user, module).orElse(null);
         return user.getRole() == Role.ADMIN || inscription != null; // all inscription are at least reader
     }
 
+    @Override
     public List<ModuleEntity> getAllModulesEditable(UserEntity user) {
         System.out.println("DEBUG getAllModulesEditable: User id = " + user.getId() + ", role = " + user.getRole());
 
@@ -222,6 +242,20 @@ public class InscriptionService implements IInscriptionService {
         return inscriptionRepository.findByUserId(user.getId()).stream()
                 .filter(InscriptionEntity::isEditor)
                 .map(InscriptionEntity::getModule)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ModuleEntity> getModulesAsIntervenant(UserEntity user) {
+        if (user == null) {
+            return List.of();
+        }
+
+        return inscriptionRepository.findByUserId(user.getId()).stream()
+                // Search by INSCRIPTION TYPE
+                .filter(inscription -> inscription.getInscriptionType() == InscriptionType.INTERVENANT)
+                .map(InscriptionEntity::getModule)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -270,8 +304,12 @@ public class InscriptionService implements IInscriptionService {
                 .collect(Collectors.toSet());
 
         List<InscriptionEntity> newInscriptions = new ArrayList<>();
+        List<String> alreadyRegisteredNames = new ArrayList<>();
         for (UserEntity member : members) {
-            if (!alreadyRegisteredIds.contains(member.getId())) {
+            if (alreadyRegisteredIds.contains(member.getId())) {
+                // already in the module: not enrolled a second time, but reported
+                alreadyRegisteredNames.add(displayName(member));
+            } else {
                 // only students have a group; the editor right stays off by default
                 newInscriptions.add(
                         new InscriptionEntity(InscriptionType.ETUDIANT, member, module));
@@ -282,7 +320,15 @@ public class InscriptionService implements IInscriptionService {
 
         return new GroupEnrollmentResult(
                 newInscriptions.size(),
-                members.size() - newInscriptions.size());
+                alreadyRegisteredNames.size(),
+                alreadyRegisteredNames);
+    }
+
+    // the username if there is one (it is optional), else the email
+    private String displayName(UserEntity user) {
+        return user.getUsername() != null && !user.getUsername().isBlank()
+                ? user.getUsername()
+                : user.getEmail();
     }
 
 }
