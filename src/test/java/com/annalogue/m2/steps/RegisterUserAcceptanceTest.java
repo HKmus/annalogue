@@ -4,8 +4,11 @@ import com.annalogue.m2.models.InscriptionEntity;
 import com.annalogue.m2.models.ModuleEntity;
 import com.annalogue.m2.models.Role;
 import com.annalogue.m2.models.UserEntity;
+import com.annalogue.m2.repositories.CommentRepository;
+import com.annalogue.m2.repositories.CorrectionRepository;
 import com.annalogue.m2.services.IInscriptionService;
 import com.annalogue.m2.services.IModuleService;
+import com.annalogue.m2.services.IPublicationService;
 import com.annalogue.m2.services.IUserService;
 import com.microsoft.playwright.*;
 import io.cucumber.java.After;
@@ -38,6 +41,25 @@ public class RegisterUserAcceptanceTest {
 
     @Autowired
     IModuleService moduleService;
+
+    @Autowired
+    private UserAcceptanceTest userSteps;
+
+    @Autowired
+    private CommentRepository commentRepository;
+
+    @Autowired
+    private CorrectionRepository correctionRepository;
+
+    @Autowired
+    private IPublicationService publicationService;
+
+    // the connection is done by UserAcceptanceTest: same browser page and same user
+    private void syncWithLoggedUser() {
+        page = userSteps.getPage();
+        user = userSteps.getCurrentUser();
+        assertNotNull(user, "No connected user: the step « Je suis connecté en tant que » must come first");
+    }
 
     // Shared between all tests in this class.
     static Playwright playwright;
@@ -87,6 +109,9 @@ public class RegisterUserAcceptanceTest {
 
         page = context.newPage();
 
+        commentRepository.deleteAllInBatch();
+        correctionRepository.deleteAllInBatch();
+        publicationService.deleteAll();
         inscriptionService.deleteAll();
         moduleService.deleteAll();
         userService.deleteAll();
@@ -115,8 +140,8 @@ public class RegisterUserAcceptanceTest {
         }
     }
 
-    @Soit("je suis connecté en tant que {string} avec le rôle {string}")
-    public void je_suis_connecte_avec_le_role(String username, String role) {
+    @Soit("Étant connecté en tant que {string} avec le rôle {string}")
+    public void Je_Suis_connecte_avec_le_role(String username, String role) {
         Role r = switch (role.toLowerCase()) {
             case "administrateur" -> Role.ADMIN;
             case "responsable de module" -> Role.RESPONSABLE;
@@ -148,8 +173,8 @@ public class RegisterUserAcceptanceTest {
         );
     }
 
-    @Et("je gère le module {string}")
-    public void je_gere_le_module(String name) {
+    @Et("Je gère le module {string}")
+    public void Je_gere_le_module(String name) {
         module = moduleService.createModule(name,user);
 
         assertTrue(
@@ -385,6 +410,14 @@ public class RegisterUserAcceptanceTest {
                         )
         );
 
+        assertTrue(moduleService.existsByName(name));
+
+        // checked in the database: the connected user manages this module and no other
+        List<ModuleEntity> managed = moduleService.findAll().stream()
+                .filter(m -> m.getResponsible().getId().equals(user.getId()))
+                .toList();
+        assertEquals(1, managed.size());
+        assertEquals(name, managed.getFirst().getName());
     }
 
     @Quand("je tente d'inscrire un utilisateur au module {string}")
@@ -498,10 +531,12 @@ public class RegisterUserAcceptanceTest {
         );
     }
 
-    @Alors("l'action m'est refusée")
+    @Alors("L’exécution de cette action m’est interdite")
     public void action_est_refusee(){
-        assertEquals("http://localhost:" + port + "/module-enrollments/new" ,page.url());
+        //syncWithLoggedUser();
 
+        String url = page.url();
+        assertTrue(url.equals("http://localhost:" + port + "/module-enrollments/new"));
     }
 
     @Et("aucun membre n'est ajouté au module {string}")
@@ -539,5 +574,13 @@ public class RegisterUserAcceptanceTest {
     @Et("les étudiants de la cohorte {string} ont tous accès au contenu du module {string}")
     public void tous_les_etudiants_ont_acces(String nomCohorte, String nomModule) {
         // TODO :
+    }
+
+    public Page getPage() {
+        return page;
+    }
+
+    public UserEntity getLoggedUser() {
+        return user;
     }
 }

@@ -2,7 +2,9 @@ package com.annalogue.m2.controllers;
 
 import com.annalogue.m2.models.*;
 import com.annalogue.m2.exceptions.InvalidModuleDataException;
+import com.annalogue.m2.services.IInscriptionService;
 import com.annalogue.m2.services.IModuleService;
+import com.annalogue.m2.services.INotificationService;
 import com.annalogue.m2.services.IUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +17,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,10 +35,17 @@ class ModuleFormErrorsTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private IInscriptionService inscriptionService;
+
+    @MockitoBean
     private IModuleService moduleService;
 
     @MockitoBean
     private IUserService userService;
+
+    @MockitoBean
+    private INotificationService notificationService;
+
     private final UserEntity teacher =
             new UserEntity("fabrice@example.com", "hash", "fabrice", Role.PROF, null, null);
 
